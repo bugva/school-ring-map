@@ -516,7 +516,7 @@ function App() {
             : 'Durak ekleme: haritaya tıklayın. Haritayı kaydırmak için sürükleyin.'
           : selectedRingId === METRO_VIEW_ID
             ? 'Metro sefer saatleri yukarıda listelenir; haritada durak işareti yok.'
-            : 'Haritayı iki parmakla yakınlaştırıp uzaklaştırabilirsiniz.'}
+            : 'Haritayı fare tekerleği veya +/- ile yakınlaştırın; dokunmatikte iki parmak da kullanılabilir.'}
       </p>
       {stopSheetPayload && !stopEditorActive ? (
         <StopTimesSheet

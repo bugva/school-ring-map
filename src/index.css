@@ -114,6 +114,45 @@ body {
   }
 }
 
+/* Masaüstü: viewport yüksekliği zinciri; harita kalan alanı doldurur */
+@media (min-width: 769px) {
+  html {
+    height: 100%;
+  }
+
+  body {
+    height: 100%;
+    min-height: 100dvh;
+  }
+
+  #root {
+    height: 100%;
+    min-height: 100dvh;
+  }
+
+  .app {
+    height: 100%;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .ring-map-wrap {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .ring-map {
+    min-height: 0;
+    height: 100%;
+  }
+
+  .stop-editor {
+    max-height: min(42vh, 380px);
+    overflow-y: auto;
+  }
+}
+
 .app--loading,
 .app--error {
   align-items: center;
