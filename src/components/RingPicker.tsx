@@ -1,13 +1,17 @@
+import { useEffect, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { Ring } from '../types/rings'
 import { METRO_VIEW_ID } from '../lib/mapView'
 
 type Props = {
   rings: Ring[]
-  /** rings.json’da metro bölümü varsa */
   hasMetro: boolean
   selectedId: string | null
   onSelect: (id: string) => void
+}
+
+function formatClock(d: Date): string {
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
 }
 
 export function RingPicker({
@@ -17,10 +21,27 @@ export function RingPicker({
   onSelect,
 }: Props) {
   const metroSelected = selectedId === METRO_VIEW_ID
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 10_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  const selectedRing = rings.find((r) => r.id === selectedId)
+  const accentColor =
+    selectedId === METRO_VIEW_ID
+      ? '#0e7490'
+      : selectedRing?.color ?? 'transparent'
 
   return (
     <header className="ring-picker" role="navigation" aria-label="Ring seçimi">
-      <p className="ring-picker__label">Ring hatları</p>
+      <div className="ring-picker__top">
+        <p className="ring-picker__label">Ring hatları</p>
+        <time className="ring-picker__clock" dateTime={now.toISOString()}>
+          {formatClock(now)}
+        </time>
+      </div>
       <div className="ring-picker__chips" role="listbox" aria-label="Ring listesi">
         {hasMetro ? (
           <button
@@ -32,7 +53,7 @@ export function RingPicker({
             onClick={() => onSelect(METRO_VIEW_ID)}
           >
             <span className="ring-picker__swatch ring-picker__swatch--metro" aria-hidden />
-            Metro
+            <span className="ring-picker__chip-label">Metro</span>
           </button>
         ) : null}
         {rings.map((ring) => {
@@ -52,11 +73,17 @@ export function RingPicker({
                 aria-hidden
                 style={{ backgroundColor: ring.color }}
               />
-              {ring.name}
+              <span className="ring-picker__chip-label">{ring.name}</span>
+              <span className="ring-picker__stop-count">{ring.stops.length}</span>
             </button>
           )
         })}
       </div>
+      <div
+        className="ring-picker__accent"
+        style={{ '--accent-color': accentColor } as CSSProperties}
+        aria-hidden
+      />
     </header>
   )
 }
