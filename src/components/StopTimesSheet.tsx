@@ -139,41 +139,40 @@ export function StopTimesSheet({
         style={sheetStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="stop-sheet__handle" aria-hidden />
-        <header className="stop-sheet__head">
-          <h2 id="stop-sheet-title" className="stop-sheet__title">
-            {stopOrder > 0 ? (
-              <>
-                <span className="stop-sheet__stop-order">{stopOrder}.</span>{' '}
-                {stop.name}
-              </>
-            ) : (
-              stop.name
-            )}
-          </h2>
-          <p className="stop-sheet__meta">
-            <span
-              className="stop-sheet__ring-badge"
-              style={{ backgroundColor: ring.color }}
-            />
-            <span className="stop-sheet__ring-name">{ring.name}</span>
-            {stopOrder > 0 ? (
-              <span className="stop-sheet__progress">
-                {stopOrder}/{totalStops}
-              </span>
-            ) : null}
-          </p>
-          <button
-            type="button"
-            className="stop-sheet__close"
-            onClick={onClose}
-            aria-label="Kapat"
-          >
-            Kapat
-          </button>
-        </header>
-
-        <div className="stop-sheet__body" ref={bodyRef}>
+        <div className="stop-sheet__sticky">
+          <div className="stop-sheet__handle" aria-hidden />
+          <header className="stop-sheet__head">
+            <h2 id="stop-sheet-title" className="stop-sheet__title">
+              {stopOrder > 0 ? (
+                <>
+                  <span className="stop-sheet__stop-order">{stopOrder}.</span>{' '}
+                  {stop.name}
+                </>
+              ) : (
+                stop.name
+              )}
+            </h2>
+            <p className="stop-sheet__meta">
+              <span
+                className="stop-sheet__ring-badge"
+                style={{ backgroundColor: ring.color }}
+              />
+              <span className="stop-sheet__ring-name">{ring.name}</span>
+              {stopOrder > 0 ? (
+                <span className="stop-sheet__progress">
+                  {stopOrder}/{totalStops}
+                </span>
+              ) : null}
+            </p>
+            <button
+              type="button"
+              className="stop-sheet__close"
+              onClick={onClose}
+              aria-label="Kapat"
+            >
+              Kapat
+            </button>
+          </header>
           {countdown ? (
             <div className="stop-sheet__countdown">
               <span className="stop-sheet__countdown-label">Sonraki sefer</span>
@@ -191,6 +190,9 @@ export function StopTimesSheet({
               />
             </div>
           ) : null}
+        </div>
+
+        <div className="stop-sheet__body" ref={bodyRef}>
           <h3 className="stop-sheet__profile-heading">{activeProfileLabel}</h3>
 
           <ul className="stop-sheet__times" aria-label="Tahmini geçiş saatleri">
