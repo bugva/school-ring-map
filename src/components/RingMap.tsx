@@ -1,5 +1,7 @@
-import { Fragment, useEffect, useMemo } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
+  Circle,
+  CircleMarker,
   MapContainer,
   Marker,
   TileLayer,
@@ -205,6 +207,55 @@ function FitMapBounds({
   return null
 }
 
+function UserLocationMarker() {
+  const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null)
+  const [accuracy, setAccuracy] = useState(0)
+  const map = useMap()
+
+  useEffect(() => {
+    if (!('geolocation' in navigator)) return
+    const watcher = navigator.geolocation.watchPosition(
+      (pos) => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setPosition(loc)
+        setAccuracy(pos.coords.accuracy)
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10_000 },
+    )
+    return () => navigator.geolocation.clearWatch(watcher)
+  }, [map])
+
+  if (!position) return null
+
+  return (
+    <>
+      <Circle
+        center={[position.lat, position.lng]}
+        radius={accuracy}
+        pathOptions={{
+          color: '#4285f4',
+          fillColor: '#4285f4',
+          fillOpacity: 0.1,
+          weight: 1,
+          opacity: 0.3,
+        }}
+      />
+      <CircleMarker
+        center={[position.lat, position.lng]}
+        radius={7}
+        pathOptions={{
+          color: '#fff',
+          fillColor: '#4285f4',
+          fillOpacity: 1,
+          weight: 2.5,
+          opacity: 1,
+        }}
+      />
+    </>
+  )
+}
+
 export function RingMap({
   ringsToShow,
   showRoutePolylines = true,
@@ -300,6 +351,7 @@ export function RingMap({
           maxNativeZoom={TILE_MAX_NATIVE_ZOOM}
         />
         <MapMarkerZoomScale />
+        <UserLocationMarker />
         <FitMapBounds
           rings={ringsToShow}
           stopsOnlyFallback={!showRoutePolylines}
