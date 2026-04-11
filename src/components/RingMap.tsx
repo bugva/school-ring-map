@@ -31,30 +31,6 @@ function createStopDivIcon(ringColor: string, order: number): L.DivIcon {
   })
 }
 
-/** Başlangıç ve bitiş durağı aynı konumdaysa ikisini tek işarette gösterir */
-function createCombinedStopDivIcon(
-  ringColor: string,
-  firstOrder: number,
-  lastOrder: number,
-): L.DivIcon {
-  const c = safeRingColor(ringColor)
-  return L.divIcon({
-    className: 'stop-marker-leaflet',
-    html: `<div class="stop-marker-hit stop-marker-hit--combined" style="--ring-color:${c}" aria-hidden="true"><div class="stop-marker-pin stop-marker-pin--combined"><span class="stop-marker-label stop-marker-label--compact">${firstOrder}</span><span class="stop-marker-combined-sep"></span><span class="stop-marker-label stop-marker-label--compact">${lastOrder}</span></div></div>`,
-    iconSize: [48, 36],
-    iconAnchor: [24, 18],
-  })
-}
-
-const SAME_LOCATION_THRESHOLD = 0.0001
-
-function areStopsColocated(a: Stop, b: Stop): boolean {
-  return (
-    Math.abs(a.lat - b.lat) < SAME_LOCATION_THRESHOLD &&
-    Math.abs(a.lng - b.lng) < SAME_LOCATION_THRESHOLD
-  )
-}
-
 /** Veri dosyasındaki duraklar özeti: tek renk, sadece konum */
 const UPLOADED_STOPS_PIN = '#57534e'
 
@@ -143,10 +119,10 @@ function MapEditorClickHandler({
 type Props = {
   ringsToShow: Ring[]
   showRoutePolylines?: boolean
-  /** CSV’deki tüm noktalar (Bütün duraklar); doluysa haritada bunlar çizilir */
+  /** CSV'deki tüm noktalar (Bütün duraklar); doluysa haritada bunlar çizilir */
   csvOverviewStops?: CsvOverviewStop[]
   onStopClick: (ringId: string, stopId: string) => void
-  /** CSV işaretinden tıklanınca (ring’de o id varsa App yine saat sayfasını açar) */
+  /** CSV işaretinden tıklanınca (ring'de o id varsa App yine saat sayfasını açar) */
   onCsvOverviewStopClick: (stopId: string, lat: number, lng: number) => void
   stopEditorActive?: boolean
   /** Editör: ring duraklarını sürükleyerek taşı */
@@ -154,7 +130,7 @@ type Props = {
   onStopPositionChange?: (ringId: string, stopId: string, lat: number, lng: number) => void
   onEditorMapClick?: (lat: number, lng: number) => void
   draftStops?: DraftStop[]
-  /** rings.json sırasındaki ilk hat id’si; rotaya tıklanınca çizim animasyonu */
+  /** rings.json sırasındaki ilk hat id'si; rotaya tıklanınca çizim animasyonu */
   firstRingIdForRouteDraw?: string | null
   /** Metro vb.: durak işaretlerini çizme */
   suppressStopMarkers?: boolean
@@ -168,7 +144,7 @@ const TILE_ATTR =
 
 const DEFAULT_CENTER: [number, number] = [39.897, 32.782]
 const DEFAULT_ZOOM = 15
-/** CARTO Voyager karoları 18’e kadar; üst zoom’da karo büyütülerek daha yakınlaşılır */
+/** CARTO Voyager karoları 18'e kadar; üst zoom'da karo büyütülerek daha yakınlaşılır */
 const MAP_MAX_ZOOM = 20
 const TILE_MAX_NATIVE_ZOOM = 18
 
@@ -241,37 +217,18 @@ export function RingMap({
   firstRingIdForRouteDraw = null,
   suppressStopMarkers = false,
 }: Props) {
-  /**
-   * ringId + stopId → sıralı numaralı işaret (her ring kendi 1..n).
-   * Başlangıç ve bitiş durağı aynı konumdaysa ilk durak birleşik ikon alır,
-   * son durak `skipStops` kümesine eklenir.
-   */
-  const { stopIconsByRingStop, skipStops } = useMemo(() => {
+  /** ringId + stopId → sıralı numaralı işaret (her ring kendi 1..n) */
+  const stopIconsByRingStop = useMemo(() => {
     const m = new Map<string, L.DivIcon>()
-    const skip = new Set<string>()
     for (const r of ringsToShow) {
-      const first = r.stops[0]
-      const last = r.stops[r.stops.length - 1]
-      const isLoop =
-        r.stops.length >= 2 && first && last && areStopsColocated(first, last)
-
       r.stops.forEach((stop, stopIdx) => {
-        if (isLoop && stopIdx === 0) {
-          m.set(
-            `${r.id}\0${stop.id}`,
-            createCombinedStopDivIcon(r.color, 1, r.stops.length),
-          )
-        } else if (isLoop && stopIdx === r.stops.length - 1) {
-          skip.add(`${r.id}\0${stop.id}`)
-        } else {
-          m.set(
-            `${r.id}\0${stop.id}`,
-            createStopDivIcon(r.color, stopIdx + 1),
-          )
-        }
+        m.set(
+          `${r.id}\0${stop.id}`,
+          createStopDivIcon(r.color, stopIdx + 1),
+        )
       })
     }
-    return { stopIconsByRingStop: m, skipStops: skip }
+    return m
   }, [ringsToShow])
 
   const dataOnlyIcon = useMemo(() => createUploadedStopsOnlyIcon(), [])
@@ -363,22 +320,14 @@ export function RingMap({
                 {ring.id === METRO_VIEW_ID
                   ? null
                   : ring.stops.map((stop, stopIdx) => {
-                  const stopKey = `${ring.id}\0${stop.id}`
-                  if (skipStops.has(stopKey)) return null
-                  const icon = stopIconsByRingStop.get(stopKey)
+                  const icon = stopIconsByRingStop.get(`${ring.id}\0${stop.id}`)
                   if (!icon) return null
-                  const isCombined = stopIdx === 0 && skipStops.has(
-                    `${ring.id}\0${ring.stops[ring.stops.length - 1]?.id}`,
-                  )
-                  const title = isCombined
-                    ? `${1}/${ring.stops.length}. ${stop.name}`
-                    : `${stopIdx + 1}. ${stop.name}`
                   return (
                     <Marker
                       key={`${ring.id}-${stopIdx}-${stop.id}`}
                       position={[stop.lat, stop.lng]}
                       icon={icon}
-                      title={title}
+                      title={`${stopIdx + 1}. ${stop.name}`}
                       draggable={Boolean(
                         stopRepositionActive && onStopPositionChange,
                       )}
