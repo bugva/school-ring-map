@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { DayProfile, Ring, Stop } from '../types/rings'
 import { buildShowAllSections } from '../lib/stopTimesShowAllSections'
@@ -19,6 +19,58 @@ type Props = {
   onClose: () => void
 }
 
+function parseTimeToMinutes(timeStr: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(timeStr.trim())
+  if (!m) return null
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+}
+
+function formatCountdown(diffMs: number): string {
+  const totalSec = Math.max(0, Math.floor(diffMs / 1000))
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h} sa ${m} dk`
+  if (m > 0) return `${m} dk ${s} sn`
+  return `${s} sn`
+}
+
+function computeCountdown(
+  times: string[],
+  now: Date,
+): { label: string; diffMs: number } | null {
+  const nowMin = now.getHours() * 60 + now.getMinutes()
+  const nowSec = now.getSeconds()
+  const nowTotalSec = nowMin * 60 + nowSec
+
+  for (const t of times) {
+    const mins = parseTimeToMinutes(t)
+    if (mins == null) continue
+    const targetSec = mins * 60
+    if (targetSec > nowTotalSec) {
+      const diffMs = (targetSec - nowTotalSec) * 1000
+      return { label: formatCountdown(diffMs), diffMs }
+    }
+  }
+  return null
+}
+
+function useCountdownToNext(
+  times: string[],
+  scheduleNow: Date | undefined,
+): { label: string; diffMs: number } | null {
+  const [now, setNow] = useState(() => new Date())
+
+  useEffect(() => {
+    if (!scheduleNow) return
+    const id = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(id)
+  }, [scheduleNow])
+
+  if (!scheduleNow) return null
+  return computeCountdown(times, now)
+}
+
 export function StopTimesSheet({
   ring,
   stop,
@@ -31,9 +83,11 @@ export function StopTimesSheet({
 
   const stopOrder =
     ring.stops.findIndex((s) => s.id === stop.id) + 1
+  const totalStops = ring.stops.length
 
   const refDate = scheduleNow ?? new Date()
   const activeTimes = stopTimesForProfile(stop.times, activeProfile, refDate)
+  const countdown = useCountdownToNext(activeTimes, scheduleNow)
   const showAllSections = useMemo(
     () => buildShowAllSections(stop, activeProfile, refDate),
     [stop, activeProfile, refDate],
@@ -78,7 +132,12 @@ export function StopTimesSheet({
               className="stop-sheet__ring-badge"
               style={{ backgroundColor: ring.color }}
             />
-            {ring.name}
+            <span className="stop-sheet__ring-name">{ring.name}</span>
+            {stopOrder > 0 ? (
+              <span className="stop-sheet__progress">
+                {stopOrder}/{totalStops}
+              </span>
+            ) : null}
           </p>
           <button
             type="button"
@@ -91,6 +150,23 @@ export function StopTimesSheet({
         </header>
 
         <div className="stop-sheet__body">
+          {countdown ? (
+            <div className="stop-sheet__countdown">
+              <span className="stop-sheet__countdown-label">Sonraki sefer</span>
+              <span className="stop-sheet__countdown-value">{countdown.label}</span>
+            </div>
+          ) : null}
+          {stopOrder > 0 ? (
+            <div className="stop-sheet__progress-bar" aria-hidden>
+              <div
+                className="stop-sheet__progress-fill"
+                style={{
+                  '--progress': `${(stopOrder / totalStops) * 100}%`,
+                  '--ring-color': ring.color,
+                } as CSSProperties}
+              />
+            </div>
+          ) : null}
           <h3 className="stop-sheet__profile-heading">{activeProfileLabel}</h3>
 
           <ul className="stop-sheet__times" aria-label="Tahmini geçiş saatleri">

@@ -254,13 +254,49 @@ body {
   animation: pickerSlideIn 0.45s var(--ease-out) both;
 }
 
+.ring-picker__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+}
+
 .ring-picker__label {
-  margin: 0 0 0.45rem;
+  margin: 0;
   font-size: 0.6875rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: #86868b;
+}
+
+@keyframes clockPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.ring-picker__clock {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #1d1d1f;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #667085, #101828);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.ring-picker__clock::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  animation: clockPulse 2s ease-in-out infinite;
 }
 
 .ring-picker__chips {
@@ -326,6 +362,26 @@ body {
   white-space: nowrap;
 }
 
+.ring-picker__stop-count {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #86868b;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0.1rem 0.4rem;
+  border-radius: 99px;
+  min-width: 1.3rem;
+  text-align: center;
+  transition:
+    background 0.2s var(--ease-smooth),
+    color 0.2s var(--ease-smooth);
+}
+
+.ring-picker__chip--selected .ring-picker__stop-count {
+  background: var(--ring-color, #22c55e);
+  color: #fff;
+}
+
 .ring-picker__swatch {
   width: 10px;
   height: 10px;
@@ -336,8 +392,18 @@ body {
   transition: transform 0.3s var(--ease-spring);
 }
 
+@keyframes swatchGlow {
+  0%, 100% {
+    box-shadow: 0 0 4px 1px currentColor;
+  }
+  50% {
+    box-shadow: 0 0 10px 3px currentColor;
+  }
+}
+
 .ring-picker__chip--selected .ring-picker__swatch {
   transform: scale(1.3);
+  animation: swatchGlow 2.5s ease-in-out infinite;
 }
 
 .ring-picker__swatch--all {
@@ -376,6 +442,27 @@ body {
     #0e7490 100%
   );
   box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.12);
+}
+
+/* Animated accent line under ring picker */
+@keyframes accentGlow {
+  0%, 100% { opacity: 0.7; filter: blur(0px); }
+  50% { opacity: 1; filter: blur(1px); }
+}
+
+.ring-picker__accent {
+  height: 2px;
+  margin-top: 0.35rem;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-color, transparent) 30%,
+    var(--accent-color, transparent) 70%,
+    transparent 100%
+  );
+  transition: background 0.4s var(--ease-smooth);
+  animation: accentGlow 3s ease-in-out infinite;
 }
 
 /* ================================================================
@@ -1397,6 +1484,10 @@ body {
   letter-spacing: -0.025em;
   color: #101828;
   line-height: 1.25;
+  background: linear-gradient(135deg, #101828 0%, #475467 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .stop-sheet__stop-order {
@@ -1479,6 +1570,97 @@ body {
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--sheet-muted);
+}
+
+/* Countdown timer */
+@keyframes countdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.stop-sheet__countdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1px solid #bbf7d0;
+  margin-bottom: 0.65rem;
+  animation: countdownFadeIn 0.3s var(--ease-out) both;
+}
+
+.stop-sheet__countdown-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #166534;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stop-sheet__countdown-value {
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: #15803d;
+  background: linear-gradient(135deg, #15803d, #059669);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Stop progress bar */
+@keyframes progressFill {
+  from { width: 0; }
+  to { width: var(--progress, 0%); }
+}
+
+.stop-sheet__progress-bar {
+  height: 3px;
+  background: #f2f4f7;
+  border-radius: 3px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.stop-sheet__progress-fill {
+  height: 100%;
+  width: var(--progress, 0%);
+  background: var(--ring-color, #6366f1);
+  border-radius: 3px;
+  animation: progressFill 0.6s var(--ease-out) both;
+  position: relative;
+}
+
+.stop-sheet__progress-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -1px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ring-color, #6366f1);
+  box-shadow: 0 0 6px var(--ring-color, #6366f1);
+}
+
+/* Stop order progress badge */
+.stop-sheet__progress {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #667085;
+  background: #f2f4f7;
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+  margin-left: auto;
 }
 
 .stop-sheet__profile-heading {
@@ -1653,6 +1835,37 @@ body {
 .stop-sheet__time-row--live .stop-sheet__time-value {
   color: #c4321d;
   font-weight: 800;
+  background: linear-gradient(135deg, #c4321d, #e85d4c);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes liveRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 93, 76, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(232, 93, 76, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 93, 76, 0);
+  }
+}
+
+.stop-sheet__time-row--live::before {
+  content: '';
+  position: absolute;
+  left: 0.85rem;
+  width: 2.125rem;
+  height: 2.125rem;
+  border-radius: 50%;
+  animation: liveRipple 2s ease-out infinite;
+  pointer-events: none;
+}
+
+.stop-sheet__time-row--live {
+  position: relative;
 }
 
 /* Future */
@@ -1771,8 +1984,14 @@ body {
   .stop-sheet__time-row,
   .stop-sheet__time-row--live,
   .stop-sheet__time-row--live .stop-sheet__time-idx,
+  .stop-sheet__time-row--live::before,
+  .stop-sheet__countdown,
+  .stop-sheet__progress-fill,
   .stop-sheet__all,
   .ring-picker,
+  .ring-picker__accent,
+  .ring-picker__clock::before,
+  .ring-picker__chip--selected .ring-picker__swatch,
   .metro-times-panel,
   .stop-editor,
   .stop-editor__form,
@@ -1792,5 +2011,9 @@ body {
     background: none;
     background-clip: unset;
     -webkit-background-clip: unset;
+  }
+
+  .stop-sheet__progress-fill {
+    width: var(--progress, 0%);
   }
 }
