@@ -12,9 +12,13 @@ export function parseScheduleMinutes(s: string): number | null {
 
 export type ScheduleSlotVisual = 'neutral' | 'past' | 'current' | 'future' | 'next'
 
+/** Sefer saatinden kaç dakika sonra "geçmiş" sayılacağı */
+const PAST_AFTER_MINUTES = 1
+
 /**
  * Bugünkü saate göre her sefer için görünüm.
- * current = son kalkış saati ≤ şimdi; next = hepsi gelecekteyken ilk sefer.
+ * current = kalkış saati ≤ şimdi ve henüz 1 dk geçmemiş; 1 dk geçince past olur.
+ * next = tüm seferler gelecekteyken ilk sefer.
  */
 export function scheduleSlotVisuals(
   times: string[],
@@ -31,7 +35,6 @@ export function scheduleSlotVisuals(
   }
   if (!validIdx.length) return out
 
-  /** Son kalkış ≤ şimdi (aynı dakikada birden fazla varsa dizideki son eşleşme) */
   let activeIdx = -1
   let bestT = -1
   for (const i of validIdx) {
@@ -40,6 +43,22 @@ export function scheduleSlotVisuals(
       bestT = t
       activeIdx = i
     }
+  }
+
+  if (activeIdx >= 0 && nowM >= bestT + PAST_AFTER_MINUTES) {
+    const nextValidIdx = validIdx.find((i) => i > activeIdx)
+    if (nextValidIdx != null) {
+      for (let i = 0; i < n; i++) {
+        const t = minutes[i]
+        if (t == null) continue
+        if (i < nextValidIdx) out[i] = 'past'
+        else if (i === nextValidIdx) out[i] = 'next'
+        else out[i] = 'future'
+      }
+      return out
+    }
+    for (const i of validIdx) out[i] = 'past'
+    return out
   }
 
   if (activeIdx < 0) {
