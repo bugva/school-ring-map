@@ -1,48 +1,37 @@
 import { useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { DayProfile, MetroLine, Stop } from '../types/rings'
-import { buildShowAllSections } from '../lib/stopTimesShowAllSections'
-import { scheduleTimeRowClass } from '../lib/scheduleTimeRowClass'
-import { stopTimesForProfile } from '../lib/stopTimesForProfile'
+import type { MetroLine, Stop } from '../types/rings'
 import {
-  scheduleSlotVisuals,
-  type ScheduleSlotVisual,
-} from '../lib/scheduleSlotState'
+  defaultMetroTabFromDate,
+  groupTimesByHour,
+  type MetroScheduleTab,
+  timesForMetroTab,
+} from '../lib/metroTimesGrid'
+
+const TAB_LABELS: Record<MetroScheduleTab, string> = {
+  weekday: 'Haftaiçi',
+  saturday: 'Cumartesi',
+  sunday: 'Pazar',
+}
 
 type Props = {
   metro: MetroLine
-  activeProfile: DayProfile
-  activeProfileLabel: string
   scheduleNow?: Date
 }
 
-function StopBlock({
+function MetroStopScheduleTable({
   stop,
   stopOrder,
-  activeProfile,
-  activeProfileLabel,
-  scheduleNow,
+  tab,
 }: {
   stop: Stop
   stopOrder: number
-  activeProfile: DayProfile
-  activeProfileLabel: string
-  scheduleNow?: Date
+  tab: MetroScheduleTab
 }) {
-  const [showAll, setShowAll] = useState(false)
-  const refDate = scheduleNow ?? new Date()
-  const activeTimes = stopTimesForProfile(stop.times, activeProfile, refDate)
-  const showAllSections = useMemo(
-    () => buildShowAllSections(stop, activeProfile, refDate),
-    [stop, activeProfile, refDate],
-  )
-  const activeVisuals = useMemo(
-    () =>
-      scheduleNow
-        ? scheduleSlotVisuals(activeTimes, scheduleNow)
-        : activeTimes.map(() => 'neutral' as ScheduleSlotVisual),
-    [activeTimes, scheduleNow],
-  )
+  const rows = useMemo(() => {
+    const flat = timesForMetroTab(stop, tab)
+    return groupTimesByHour(flat)
+  }, [stop, tab])
 
   return (
     <div className="metro-times-panel__stop">
@@ -56,92 +45,55 @@ function StopBlock({
           stop.name
         )}
       </h3>
-      <p className="metro-times-panel__stop-context">{activeProfileLabel}</p>
-      <ul
-        className="stop-sheet__times"
-        aria-label={`${stop.name} tahmini geçiş saatleri`}
+      <div
+        className="metro-schedule"
+        role="table"
+        aria-label={`${stop.name} kalkış saatleri (${TAB_LABELS[tab]})`}
       >
-        {activeTimes.length ? (
-          activeTimes.map((t, i) => (
-            <li
-              key={`${stop.id}-${t}-${i}`}
-              className={[
-                'stop-sheet__time-row',
-                scheduleTimeRowClass(activeVisuals[i] ?? 'neutral'),
-              ]
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <span className="stop-sheet__time-idx" aria-hidden="true">
-                {i + 1}
-              </span>
-              <span className="stop-sheet__time-value">{t}</span>
-            </li>
+        <div className="metro-schedule__head" role="row">
+          <div className="metro-schedule__head-cell metro-schedule__head-cell--hour">
+            Saat
+          </div>
+          <div className="metro-schedule__head-cell metro-schedule__head-cell--minutes">
+            Dakika
+          </div>
+        </div>
+        {rows.length ? (
+          rows.map((row) => (
+            <div className="metro-schedule__row" key={row.hour} role="row">
+              <div className="metro-schedule__hour" role="cell">
+                {row.hour}
+              </div>
+              <div className="metro-schedule__minutes" role="cell">
+                {row.minutes.join(' ')}
+              </div>
+            </div>
           ))
         ) : (
-          <li className="stop-sheet__empty">Bu dilimde kayıt yok.</li>
+          <p className="metro-schedule__empty" role="status">
+            Bu gün tipi için kayıt yok.
+          </p>
         )}
-      </ul>
-      <button
-        type="button"
-        className="stop-sheet__toggle metro-times-panel__toggle"
-        onClick={() => setShowAll((v) => !v)}
-        aria-expanded={showAll}
-      >
-        {showAll ? 'Diğer dilimleri gizle' : 'Tüm dilimleri göster'}
-      </button>
-      {showAll ? (
-        <div className="stop-sheet__all metro-times-panel__all">
-          {showAllSections.map((sec) => {
-            const blockTimes = sec.times
-            const blockVisuals = scheduleNow
-              ? scheduleSlotVisuals(blockTimes, scheduleNow)
-              : blockTimes.map(() => 'neutral' as ScheduleSlotVisual)
-            return (
-              <div key={`${stop.id}-${sec.key}`} className="stop-sheet__block">
-                <h4 className="stop-sheet__block-title">{sec.title}</h4>
-                <ul className="stop-sheet__times stop-sheet__times--compact">
-                  {blockTimes.length ? (
-                    blockTimes.map((t, i) => (
-                      <li
-                        key={`${stop.id}-${sec.key}-${t}-${i}`}
-                        className={[
-                          'stop-sheet__time-row',
-                          scheduleTimeRowClass(blockVisuals[i] ?? 'neutral'),
-                        ]
-                          .filter(Boolean)
-                          .join(' ')}
-                      >
-                        <span className="stop-sheet__time-idx" aria-hidden="true">
-                          {i + 1}
-                        </span>
-                        <span className="stop-sheet__time-value">{t}</span>
-                      </li>
-                    ))
-                  ) : (
-                    <li className="stop-sheet__empty stop-sheet__empty--inline">
-                      —
-                    </li>
-                  )}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
+      </div>
     </div>
   )
 }
 
-export function MetroTimesPanel({
-  metro,
-  activeProfile,
-  activeProfileLabel,
-  scheduleNow,
-}: Props) {
+export function MetroTimesPanel({ metro, scheduleNow }: Props) {
+  const refDate = scheduleNow ?? new Date()
+  const [tab, setTab] = useState<MetroScheduleTab>(() =>
+    defaultMetroTabFromDate(refDate),
+  )
+
   const style = {
     '--sheet-accent': metro.color,
   } as CSSProperties
+
+  const tabIds = {
+    weekday: 'metro-tab-weekday',
+    saturday: 'metro-tab-saturday',
+    sunday: 'metro-tab-sunday',
+  } as const
 
   return (
     <section
@@ -157,18 +109,42 @@ export function MetroTimesPanel({
         />
         <div>
           <h2 className="metro-times-panel__title">{metro.name}</h2>
-          <p className="metro-times-panel__subtitle">{activeProfileLabel}</p>
+          <p className="metro-times-panel__subtitle">
+            Gün tipini seçin; tabloda saat ve dakikalar listelenir.
+          </p>
         </div>
       </div>
-      <div className="metro-times-panel__scroll">
+      <div
+        className="metro-times-panel__tabs"
+        role="tablist"
+        aria-label="Metro gün tipi"
+      >
+        {(Object.keys(TAB_LABELS) as MetroScheduleTab[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            id={tabIds[key]}
+            role="tab"
+            aria-selected={tab === key}
+            tabIndex={tab === key ? 0 : -1}
+            className={`metro-times-panel__tab${tab === key ? ' metro-times-panel__tab--selected' : ''}`}
+            onClick={() => setTab(key)}
+          >
+            {TAB_LABELS[key]}
+          </button>
+        ))}
+      </div>
+      <div
+        className="metro-times-panel__scroll"
+        role="tabpanel"
+        aria-labelledby={tabIds[tab]}
+      >
         {metro.stops.map((stop, idx) => (
-          <StopBlock
+          <MetroStopScheduleTable
             key={stop.id}
             stop={stop}
             stopOrder={idx + 1}
-            activeProfile={activeProfile}
-            activeProfileLabel={activeProfileLabel}
-            scheduleNow={scheduleNow}
+            tab={tab}
           />
         ))}
       </div>

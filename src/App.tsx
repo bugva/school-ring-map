@@ -462,8 +462,6 @@ function App() {
       !(stopEditorActive && showStopEditor) ? (
         <MetroTimesPanel
           metro={metro}
-          activeProfile={dayInfo.profile}
-          activeProfileLabel={dayInfo.label}
           scheduleNow={new Date(clock)}
         />
       ) : null}

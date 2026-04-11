@@ -320,6 +320,125 @@ body {
   color: #667085;
 }
 
+.metro-times-panel__tabs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0 1rem 0.55rem;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.metro-times-panel__tab {
+  flex: 1;
+  min-width: 0;
+  padding: 0.45rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #475467;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1.25;
+}
+
+.metro-times-panel__tab:hover {
+  background: #eef2f6;
+}
+
+.metro-times-panel__tab:focus-visible {
+  outline: 2px solid var(--sheet-accent, #0e7490);
+  outline-offset: 2px;
+}
+
+.metro-times-panel__tab--selected {
+  background: #101828;
+  color: #fff;
+  border-color: #101828;
+}
+
+.metro-times-panel__tab--selected:hover {
+  background: #1d2939;
+}
+
+.metro-schedule {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 0.65rem;
+  overflow: hidden;
+  margin-top: 0.45rem;
+  font-size: 0.875rem;
+}
+
+.metro-schedule__head {
+  display: flex;
+  align-items: stretch;
+  background: #f2f4f7;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.metro-schedule__head-cell {
+  padding: 0.45rem 0.5rem;
+  font-weight: 600;
+  color: #344054;
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.metro-schedule__head-cell--hour {
+  flex: 0 0 2.75rem;
+  text-align: center;
+  background: #e4e7ec;
+}
+
+.metro-schedule__head-cell--minutes {
+  flex: 1;
+  min-width: 0;
+  padding-left: 0.65rem;
+}
+
+.metro-schedule__row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.metro-schedule__row:last-child {
+  border-bottom: none;
+}
+
+.metro-schedule__hour {
+  flex: 0 0 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: #eaecf0;
+  color: #101828;
+  padding: 0.4rem 0.3rem;
+}
+
+.metro-schedule__minutes {
+  flex: 1;
+  min-width: 0;
+  padding: 0.4rem 0.55rem;
+  background: #fff;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: #1d2939;
+  word-wrap: break-word;
+}
+
+.metro-schedule__empty {
+  margin: 0;
+  padding: 0.85rem 0.65rem;
+  text-align: center;
+  color: #667085;
+  font-size: 0.8125rem;
+  background: #fff;
+}
+
 .metro-times-panel__scroll {
   overflow-y: auto;
   padding: 0.65rem 1rem 0.85rem;
