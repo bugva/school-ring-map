@@ -1,0 +1,69 @@
+/** "HH:MM" → günün dakikası; geçersizse null */
+export function parseScheduleMinutes(s: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim())
+  if (!m) return null
+  const h = Number(m[1])
+  const min = Number(m[2])
+  if (!Number.isFinite(h) || !Number.isFinite(min) || h > 23 || min > 59) {
+    return null
+  }
+  return h * 60 + min
+}
+
+export type ScheduleSlotVisual = 'neutral' | 'past' | 'current' | 'future' | 'next'
+
+/**
+ * Bugünkü saate göre her sefer için görünüm.
+ * current = son kalkış saati ≤ şimdi; next = hepsi gelecekteyken ilk sefer.
+ */
+export function scheduleSlotVisuals(
+  times: string[],
+  now: Date,
+): ScheduleSlotVisual[] {
+  const nowM = now.getHours() * 60 + now.getMinutes()
+  const minutes = times.map(parseScheduleMinutes)
+  const n = times.length
+  const out: ScheduleSlotVisual[] = times.map(() => 'neutral')
+
+  const validIdx: number[] = []
+  for (let i = 0; i < n; i++) {
+    if (minutes[i] != null) validIdx.push(i)
+  }
+  if (!validIdx.length) return out
+
+  /** Son kalkış ≤ şimdi (aynı dakikada birden fazla varsa dizideki son eşleşme) */
+  let activeIdx = -1
+  let bestT = -1
+  for (const i of validIdx) {
+    const t = minutes[i]!
+    if (t <= nowM && t >= bestT) {
+      bestT = t
+      activeIdx = i
+    }
+  }
+
+  if (activeIdx < 0) {
+    let firstIdx = validIdx[0]!
+    let firstM = minutes[firstIdx]!
+    for (const i of validIdx) {
+      const t = minutes[i]!
+      if (t < firstM) {
+        firstM = t
+        firstIdx = i
+      }
+    }
+    for (const i of validIdx) {
+      out[i] = i === firstIdx ? 'next' : 'future'
+    }
+    return out
+  }
+
+  for (let i = 0; i < n; i++) {
+    const t = minutes[i]
+    if (t == null) continue
+    if (i < activeIdx) out[i] = 'past'
+    else if (i === activeIdx) out[i] = 'current'
+    else out[i] = 'future'
+  }
+  return out
+}

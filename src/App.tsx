@@ -1,0 +1,579 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  clearEditorDraft,
+  readEditorDraft,
+  writeEditorDraft,
+} from './lib/editorDraftStorage'
+import { downloadTextFile } from './lib/downloadText'
+import { patchOverviewCsvLine } from './lib/patchOverviewCsvText'
+import { ringsDataSchema } from './lib/ringsSchema'
+import { getDayProfile } from './lib/dayProfile'
+import { isStopEditorEnabled } from './lib/stopEditorEnv'
+import {
+  ALL_STOPS_VIEW_ID,
+  METRO_VIEW_ID,
+  STOPS_ONLY_VIEW_ID,
+} from './lib/mapView'
+import { metroLineAsRing } from './lib/metroRing'
+import { publicUrl } from './lib/publicUrl'
+import {
+  parseStopsOverviewCsv,
+  type CsvOverviewStop,
+} from './lib/parseStopsOverviewCsv'
+import type { MetroLine, Ring } from './types/rings'
+import { CsvStopSheet } from './components/CsvStopSheet'
+import { RingPicker } from './components/RingPicker'
+import { RingMap } from './components/RingMap'
+import { StopsOverviewPanel } from './components/StopsOverviewPanel'
+import { MetroTimesPanel } from './components/MetroTimesPanel'
+import { StopTimesSheet } from './components/StopTimesSheet'
+import { StopEditorPanel, type DraftStop } from './components/StopEditorPanel'
+
+function App() {
+  const showStopEditor = isStopEditorEnabled()
+  const [rings, setRings] = useState<Ring[]>([])
+  const [metro, setMetro] = useState<MetroLine | null>(null)
+  const [eveningHour, setEveningHour] = useState(17)
+  const [selectedRingId, setSelectedRingId] = useState<string | null>(null)
+  const [openStopRef, setOpenStopRef] = useState<{
+    ringId: string
+    stopId: string
+  } | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [clock, setClock] = useState(() => Date.now())
+
+  const [stopEditorActive, setStopEditorActive] = useState(false)
+  const [pendingLatLng, setPendingLatLng] = useState<{
+    lat: number
+    lng: number
+  } | null>(null)
+  const [draftStops, setDraftStops] = useState<DraftStop[]>([])
+  const [repositionStopsActive, setRepositionStopsActive] = useState(false)
+  const [ringsDataDirty, setRingsDataDirty] = useState(false)
+  const [browserDraftSavedAt, setBrowserDraftSavedAt] = useState<string | null>(
+    null,
+  )
+  const [editorFileFeedback, setEditorFileFeedback] = useState<string | null>(
+    null,
+  )
+
+  const [overviewCsvText, setOverviewCsvText] = useState<string | null>(null)
+  const [overviewStops, setOverviewStops] = useState<CsvOverviewStop[]>([])
+  const [overviewCsvLoaded, setOverviewCsvLoaded] = useState(false)
+  const [overviewCsvErr, setOverviewCsvErr] = useState<string | null>(null)
+  const [csvOnlyStop, setCsvOnlyStop] = useState<{
+    id: string
+    lat: number
+    lng: number
+  } | null>(null)
+
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(Date.now()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch(publicUrl('data/stops-overview.csv'))
+      .then((res) => {
+        if (!res.ok) throw new Error(`CSV okunamadı (${res.status})`)
+        return res.text()
+      })
+      .then((t) => {
+        if (cancelled) return
+        setOverviewCsvText(t.trim())
+        setOverviewStops(parseStopsOverviewCsv(t))
+        setOverviewCsvErr(null)
+        setOverviewCsvLoaded(true)
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setOverviewCsvErr(e instanceof Error ? e.message : 'Hata')
+          setOverviewCsvText(null)
+          setOverviewStops([])
+          setOverviewCsvLoaded(true)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!showStopEditor) return
+    setBrowserDraftSavedAt(readEditorDraft()?.savedAt ?? null)
+  }, [showStopEditor])
+
+  useEffect(() => {
+    if (!showStopEditor || !stopEditorActive || !ringsDataDirty) return
+    const id = window.setTimeout(() => {
+      const savedAt = writeEditorDraft({
+        eveningHourLocal: eveningHour,
+        rings,
+        overviewCsvText,
+        metro,
+      })
+      setBrowserDraftSavedAt(savedAt)
+    }, 600)
+    return () => window.clearTimeout(id)
+  }, [
+    showStopEditor,
+    stopEditorActive,
+    ringsDataDirty,
+    eveningHour,
+    rings,
+    overviewCsvText,
+    metro,
+  ])
+
+  useEffect(() => {
+    setOpenStopRef(null)
+    setCsvOnlyStop(null)
+  }, [selectedRingId])
+
+  useEffect(() => {
+    if (!stopEditorActive) {
+      setPendingLatLng(null)
+      setRepositionStopsActive(false)
+    }
+  }, [stopEditorActive])
+
+  const reloadDataFromServer = useCallback(async () => {
+    setLoadError(null)
+    try {
+      const res = await fetch(publicUrl('data/rings.json'))
+      if (!res.ok) throw new Error(`Veri yüklenemedi (${res.status})`)
+      const json = await res.json()
+      const parsed = ringsDataSchema.safeParse(json)
+      if (!parsed.success) {
+        console.error(parsed.error)
+        throw new Error('rings.json şeması geçersiz')
+      }
+      setEveningHour(parsed.data.eveningHourLocal)
+      setRings(parsed.data.rings)
+      setMetro(parsed.data.metro ?? null)
+
+      const cr = await fetch(publicUrl('data/stops-overview.csv'))
+      if (cr.ok) {
+        const t = await cr.text()
+        const trimmed = t.trim()
+        setOverviewCsvText(trimmed)
+        setOverviewStops(parseStopsOverviewCsv(t))
+        setOverviewCsvErr(null)
+      }
+      clearEditorDraft()
+      setBrowserDraftSavedAt(null)
+      setRingsDataDirty(false)
+      setRepositionStopsActive(false)
+      setOpenStopRef(null)
+      setCsvOnlyStop(null)
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Bilinmeyen hata')
+    }
+  }, [])
+
+  const applyStopPosition = useCallback(
+    (ringId: string, stopId: string, lat: number, lng: number) => {
+      if (ringId === METRO_VIEW_ID) {
+        setMetro((m) =>
+          m
+            ? {
+                ...m,
+                stops: m.stops.map((s) =>
+                  s.id !== stopId ? s : { ...s, lat, lng },
+                ),
+              }
+            : null,
+        )
+        setRingsDataDirty(true)
+        return
+      }
+      setRings((prev) =>
+        prev.map((ring) =>
+          ring.id !== ringId
+            ? ring
+            : {
+                ...ring,
+                stops: ring.stops.map((s) =>
+                  s.id !== stopId ? s : { ...s, lat, lng },
+                ),
+              },
+        ),
+      )
+      setOverviewStops((prev) =>
+        prev.map((row) =>
+          row.id === stopId ? { ...row, lat, lng } : row,
+        ),
+      )
+      setOverviewCsvText((t) =>
+        t ? patchOverviewCsvLine(t, stopId, lat, lng) : t,
+      )
+      setRingsDataDirty(true)
+    },
+    [],
+  )
+
+  const handleExportRingsJson = useCallback(() => {
+    const doc = {
+      eveningHourLocal: eveningHour,
+      rings,
+      ...(metro ? { metro } : {}),
+    }
+    const json = JSON.stringify(doc, null, 2) + '\n'
+    downloadTextFile('rings.json', json)
+    if (overviewCsvText != null) {
+      downloadTextFile(
+        'stops-overview.csv',
+        `${overviewCsvText.trim()}\n`,
+        'text/csv',
+      )
+    }
+    if (showStopEditor && stopEditorActive) {
+      const savedAt = writeEditorDraft({
+        eveningHourLocal: eveningHour,
+        rings,
+        overviewCsvText,
+        metro,
+      })
+      setBrowserDraftSavedAt(savedAt)
+    }
+    setRingsDataDirty(false)
+  }, [
+    eveningHour,
+    rings,
+    metro,
+    overviewCsvText,
+    showStopEditor,
+    stopEditorActive,
+  ])
+
+  const flashEditorFeedback = useCallback((msg: string) => {
+    setEditorFileFeedback(msg)
+    window.setTimeout(() => setEditorFileFeedback(null), 4500)
+  }, [])
+
+  const syncRingStopsFromOverview = useCallback((rows: CsvOverviewStop[]) => {
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    setRings((prev) =>
+      prev.map((ring) => ({
+        ...ring,
+        stops: ring.stops.map((s) => {
+          const o = byId.get(s.id)
+          return o ? { ...s, lat: o.lat, lng: o.lng } : s
+        }),
+      })),
+    )
+  }, [])
+
+  const handleRestoreBrowserDraft = useCallback(() => {
+    const d = readEditorDraft()
+    if (!d) {
+      flashEditorFeedback('Tarayıcıda kayıtlı taslak yok.')
+      setBrowserDraftSavedAt(null)
+      return
+    }
+    setEveningHour(d.eveningHourLocal)
+    setRings(d.rings)
+    setMetro(d.metro ?? null)
+    if (d.overviewCsvText != null && d.overviewCsvText.trim() !== '') {
+      const t = d.overviewCsvText.trim()
+      setOverviewCsvText(t)
+      setOverviewStops(parseStopsOverviewCsv(t))
+      setOverviewCsvErr(null)
+    }
+    setRingsDataDirty(true)
+    flashEditorFeedback('Taslak belleğe yüklendi; isterseniz tekrar indirin.')
+  }, [flashEditorFeedback])
+
+  const handleClearBrowserDraft = useCallback(() => {
+    clearEditorDraft()
+    setBrowserDraftSavedAt(null)
+    flashEditorFeedback('Tarayıcı taslağı silindi.')
+  }, [flashEditorFeedback])
+
+  const handleImportRingsJsonFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text()
+        const json = JSON.parse(text) as unknown
+        const parsed = ringsDataSchema.safeParse(json)
+        if (!parsed.success) {
+          flashEditorFeedback('rings.json şemaya uymuyor veya dosya bozuk.')
+          return
+        }
+        setEveningHour(parsed.data.eveningHourLocal)
+        setRings(parsed.data.rings)
+        setMetro(parsed.data.metro ?? null)
+        setRingsDataDirty(true)
+        flashEditorFeedback(`rings.json yüklendi (${file.name}).`)
+      } catch {
+        flashEditorFeedback('rings.json okunamadı.')
+      }
+    },
+    [flashEditorFeedback],
+  )
+
+  const handleImportOverviewCsvFile = useCallback(
+    async (file: File) => {
+      try {
+        const text = await file.text()
+        const trimmed = text.trim()
+        const rows = parseStopsOverviewCsv(trimmed)
+        if (rows.length === 0) {
+          flashEditorFeedback('CSV’de geçerli durak satırı bulunamadı.')
+          return
+        }
+        setOverviewCsvText(trimmed)
+        setOverviewStops(rows)
+        setOverviewCsvErr(null)
+        syncRingStopsFromOverview(rows)
+        setRingsDataDirty(true)
+        flashEditorFeedback(`stops-overview.csv uygulandı (${file.name}).`)
+      } catch {
+        flashEditorFeedback('CSV okunamadı.')
+      }
+    },
+    [flashEditorFeedback, syncRingStopsFromOverview],
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(publicUrl('data/rings.json'))
+        if (!res.ok) throw new Error(`Veri yüklenemedi (${res.status})`)
+        const json = await res.json()
+        const parsed = ringsDataSchema.safeParse(json)
+        if (!parsed.success) {
+          console.error(parsed.error)
+          throw new Error('rings.json şeması geçersiz')
+        }
+        if (cancelled) return
+        setEveningHour(parsed.data.eveningHourLocal)
+        setRings(parsed.data.rings)
+        setMetro(parsed.data.metro ?? null)
+        setSelectedRingId(
+          (prev) => prev ?? parsed.data.rings[0]?.id ?? ALL_STOPS_VIEW_ID,
+        )
+      } catch (e) {
+        if (!cancelled) {
+          setLoadError(e instanceof Error ? e.message : 'Bilinmeyen hata')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const ringsToShow = useMemo(() => {
+    if (selectedRingId === METRO_VIEW_ID && metro) {
+      return [metroLineAsRing(metro)]
+    }
+    if (
+      selectedRingId === ALL_STOPS_VIEW_ID ||
+      selectedRingId === STOPS_ONLY_VIEW_ID
+    ) {
+      return rings
+    }
+    return rings.filter((r) => r.id === selectedRingId)
+  }, [rings, selectedRingId, metro])
+
+  const showRoutePolylines =
+    selectedRingId !== STOPS_ONLY_VIEW_ID &&
+    selectedRingId !== METRO_VIEW_ID
+
+  const dayInfo = getDayProfile(new Date(clock), eveningHour)
+
+  const firstRingIdForRouteDraw = useMemo(
+    () => rings[0]?.id ?? null,
+    [rings],
+  )
+
+  const stopSheetPayload = useMemo(() => {
+    if (!openStopRef) return null
+    if (openStopRef.ringId === METRO_VIEW_ID && metro) {
+      const stop = metro.stops.find((s) => s.id === openStopRef.stopId)
+      if (!stop) return null
+      return { ring: metroLineAsRing(metro), stop }
+    }
+    const ring = rings.find((r) => r.id === openStopRef.ringId)
+    const stop = ring?.stops.find((s) => s.id === openStopRef.stopId)
+    if (!ring || !stop) return null
+    return { ring, stop }
+  }, [rings, openStopRef, metro])
+
+  const handleStopClick = useCallback(
+    (ringId: string, stopId: string) => {
+      if (stopEditorActive) return
+      setCsvOnlyStop(null)
+      setOpenStopRef({ ringId, stopId })
+    },
+    [stopEditorActive],
+  )
+
+  const handleCsvOverviewStopClick = useCallback(
+    (stopId: string, lat: number, lng: number) => {
+      if (stopEditorActive) return
+      for (const ring of rings) {
+        const s = ring.stops.find((x) => x.id === stopId)
+        if (s) {
+          setCsvOnlyStop(null)
+          setOpenStopRef({ ringId: ring.id, stopId })
+          return
+        }
+      }
+      setOpenStopRef(null)
+      setCsvOnlyStop({ id: stopId, lat, lng })
+    },
+    [rings, stopEditorActive],
+  )
+
+  const closeSheet = useCallback(() => setOpenStopRef(null), [])
+  const closeCsvSheet = useCallback(() => setCsvOnlyStop(null), [])
+
+  const handleEditorMapClick = useCallback((lat: number, lng: number) => {
+    setPendingLatLng({ lat, lng })
+  }, [])
+
+  const handlePendingConfirm = useCallback((id: string, name: string) => {
+    setPendingLatLng((p) => {
+      if (!p) return null
+      const { lat, lng } = p
+      setDraftStops((list) => [
+        ...list,
+        { key: crypto.randomUUID(), id, name, lat, lng },
+      ])
+      return null
+    })
+  }, [])
+
+  const handlePendingClear = useCallback(() => setPendingLatLng(null), [])
+
+  const handleRemoveDraft = useCallback((key: string) => {
+    setDraftStops((list) => list.filter((d) => d.key !== key))
+  }, [])
+
+  const handleClearDrafts = useCallback(() => setDraftStops([]), [])
+
+  if (loadError) {
+    return (
+      <div className="app app--error">
+        <p>{loadError}</p>
+      </div>
+    )
+  }
+
+  if (!rings.length) {
+    return (
+      <div className="app app--loading">
+        <p>Ring verileri yükleniyor…</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="app">
+      <RingPicker
+        rings={rings}
+        hasMetro={Boolean(metro)}
+        selectedId={selectedRingId}
+        onSelect={setSelectedRingId}
+      />
+      <StopsOverviewPanel
+        active={selectedRingId === STOPS_ONLY_VIEW_ID}
+        csvText={overviewCsvText}
+        csvLoaded={overviewCsvLoaded}
+        csvError={overviewCsvErr}
+      />
+      {selectedRingId === METRO_VIEW_ID &&
+      metro &&
+      !(stopEditorActive && showStopEditor) ? (
+        <MetroTimesPanel
+          metro={metro}
+          activeProfile={dayInfo.profile}
+          activeProfileLabel={dayInfo.label}
+          scheduleNow={new Date(clock)}
+        />
+      ) : null}
+      {showStopEditor ? (
+        <StopEditorPanel
+          active={stopEditorActive}
+          onActiveChange={setStopEditorActive}
+          pendingLatLng={pendingLatLng}
+          onPendingClear={handlePendingClear}
+          onPendingConfirm={handlePendingConfirm}
+          drafts={draftStops}
+          onRemoveDraft={handleRemoveDraft}
+          onClearDrafts={handleClearDrafts}
+          repositionActive={repositionStopsActive}
+          onRepositionChange={setRepositionStopsActive}
+          ringsDataDirty={ringsDataDirty}
+          onExportRingsJson={handleExportRingsJson}
+          onReloadData={reloadDataFromServer}
+          browserDraftSavedAt={browserDraftSavedAt}
+          onRestoreBrowserDraft={handleRestoreBrowserDraft}
+          onClearBrowserDraft={handleClearBrowserDraft}
+          onImportRingsJsonFile={handleImportRingsJsonFile}
+          onImportOverviewCsvFile={handleImportOverviewCsvFile}
+          fileFeedback={editorFileFeedback}
+        />
+      ) : null}
+      <RingMap
+        ringsToShow={ringsToShow}
+        showRoutePolylines={showRoutePolylines}
+        csvOverviewStops={
+          selectedRingId === STOPS_ONLY_VIEW_ID ? overviewStops : []
+        }
+        onStopClick={handleStopClick}
+        onCsvOverviewStopClick={handleCsvOverviewStopClick}
+        stopEditorActive={stopEditorActive && showStopEditor}
+        stopRepositionActive={
+          Boolean(stopEditorActive && showStopEditor && repositionStopsActive) &&
+          selectedRingId !== STOPS_ONLY_VIEW_ID &&
+          selectedRingId !== METRO_VIEW_ID
+        }
+        onStopPositionChange={
+          showStopEditor ? applyStopPosition : undefined
+        }
+        onEditorMapClick={showStopEditor ? handleEditorMapClick : undefined}
+        draftStops={stopEditorActive ? draftStops : []}
+        firstRingIdForRouteDraw={firstRingIdForRouteDraw}
+        suppressStopMarkers={selectedRingId === METRO_VIEW_ID}
+      />
+      <p className="app__map-hint" aria-live="polite">
+        {stopEditorActive && showStopEditor
+          ? repositionStopsActive
+            ? selectedRingId === STOPS_ONLY_VIEW_ID
+              ? 'Bu görünümde sürükleme yok; tek ring veya “Tüm duraklar” seçin.'
+              : 'Durak işaretini sürükleyin. Bitince panelde “Tamam — rings.json indir”.'
+            : 'Durak ekleme: haritaya tıklayın. Haritayı kaydırmak için sürükleyin.'
+          : selectedRingId === STOPS_ONLY_VIEW_ID
+            ? 'CSV’deki tüm duraklar haritada (rota çizgisi yok). Yakınlaştırmak için iki parmak kullanın.'
+            : selectedRingId === METRO_VIEW_ID
+              ? 'Metro sefer saatleri yukarıda listelenir; haritada durak işareti yok.'
+              : 'Haritayı iki parmakla yakınlaştırıp uzaklaştırabilirsiniz.'}
+      </p>
+      {stopSheetPayload && !stopEditorActive ? (
+        <StopTimesSheet
+          ring={stopSheetPayload.ring}
+          stop={stopSheetPayload.stop}
+          activeProfile={dayInfo.profile}
+          activeProfileLabel={dayInfo.label}
+          scheduleNow={new Date(clock)}
+          onClose={closeSheet}
+        />
+      ) : null}
+      {csvOnlyStop && !stopEditorActive ? (
+        <CsvStopSheet
+          stopId={csvOnlyStop.id}
+          lat={csvOnlyStop.lat}
+          lng={csvOnlyStop.lng}
+          onClose={closeCsvSheet}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+export default App
