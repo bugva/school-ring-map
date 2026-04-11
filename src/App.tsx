@@ -12,6 +12,7 @@ import { isStopEditorEnabled } from './lib/stopEditorEnv'
 import { METRO_VIEW_ID } from './lib/mapView'
 import { metroLineAsRing } from './lib/metroRing'
 import { publicUrl } from './lib/publicUrl'
+import { nearestPolylineVertexIndex } from './lib/splitPolylineNearStop'
 import {
   parseStopsOverviewCsv,
   type CsvOverviewStop,
@@ -362,11 +363,27 @@ function App() {
     const matched = rings.filter((r) => r.id === selectedRingId)
     if (selectedRingId !== 'gri' || griLegFilter === 'all') return matched
     return matched.map((ring) => {
+      const splitStop = ring.stops[GRI_SPLIT_INDEX]
       const slicedStops =
         griLegFilter === 'a2-a1'
           ? ring.stops.slice(0, GRI_SPLIT_INDEX + 1)
           : ring.stops.slice(GRI_SPLIT_INDEX)
-      return { ...ring, stops: slicedStops }
+
+      let slicedPolyline = ring.polyline
+      if (ring.polyline.length >= 2 && splitStop) {
+        const k = nearestPolylineVertexIndex(
+          ring.polyline as [number, number][],
+          splitStop.lat,
+          splitStop.lng,
+        )
+        const safeK = Math.min(Math.max(k, 1), ring.polyline.length - 1)
+        slicedPolyline =
+          griLegFilter === 'a2-a1'
+            ? ring.polyline.slice(0, safeK + 1)
+            : ring.polyline.slice(safeK)
+      }
+
+      return { ...ring, stops: slicedStops, polyline: slicedPolyline }
     })
   }, [rings, selectedRingId, metro, griLegFilter])
 
