@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import type { DayProfile, Ring, Stop } from '../types/rings'
 import { buildShowAllSections } from '../lib/stopTimesShowAllSections'
@@ -101,6 +101,30 @@ export function StopTimesSheet({
     [activeTimes, scheduleNow],
   )
 
+  const liveRowRef = useRef<HTMLLIElement>(null)
+  const bodyRef = useRef<HTMLDivElement>(null)
+
+  const firstLiveIdx = useMemo(() => {
+    for (let i = 0; i < activeVisuals.length; i++) {
+      const v = activeVisuals[i]
+      if (v === 'current' || v === 'next') return i
+    }
+    return -1
+  }, [activeVisuals])
+
+  const scrollToLive = useCallback(() => {
+    const el = liveRowRef.current
+    const body = bodyRef.current
+    if (!el || !body) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (firstLiveIdx >= 0) scrollToLive()
+  }, [firstLiveIdx, scrollToLive])
+
   const sheetStyle = {
     '--sheet-accent': ring.color,
   } as CSSProperties
@@ -149,7 +173,7 @@ export function StopTimesSheet({
           </button>
         </header>
 
-        <div className="stop-sheet__body">
+        <div className="stop-sheet__body" ref={bodyRef}>
           {countdown ? (
             <div className="stop-sheet__countdown">
               <span className="stop-sheet__countdown-label">Sonraki sefer</span>
@@ -171,22 +195,27 @@ export function StopTimesSheet({
 
           <ul className="stop-sheet__times" aria-label="Tahmini geçiş saatleri">
             {activeTimes.length ? (
-              activeTimes.map((t, i) => (
-                <li
-                  key={`${t}-${i}`}
-                  className={[
-                    'stop-sheet__time-row',
-                    scheduleTimeRowClass(activeVisuals[i] ?? 'neutral'),
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                >
-                  <span className="stop-sheet__time-idx" aria-hidden="true">
-                    {i + 1}
-                  </span>
-                  <span className="stop-sheet__time-value">{t}</span>
-                </li>
-              ))
+              activeTimes.map((t, i) => {
+                const visual = activeVisuals[i] ?? 'neutral'
+                const isLiveRow = i === firstLiveIdx
+                return (
+                  <li
+                    key={`${t}-${i}`}
+                    ref={isLiveRow ? liveRowRef : undefined}
+                    className={[
+                      'stop-sheet__time-row',
+                      scheduleTimeRowClass(visual),
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
+                  >
+                    <span className="stop-sheet__time-idx" aria-hidden="true">
+                      {i + 1}
+                    </span>
+                    <span className="stop-sheet__time-value">{t}</span>
+                  </li>
+                )
+              })
             ) : (
               <li className="stop-sheet__empty">Bu dilimde kayıt yok.</li>
             )}
