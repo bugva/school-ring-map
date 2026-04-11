@@ -341,7 +341,7 @@ function App() {
         setEveningHour(parsed.data.eveningHourLocal)
         setRings(parsed.data.rings)
         setMetro(parsed.data.metro ?? null)
-        setSelectedRingId((prev) => prev ?? parsed.data.rings[0]?.id ?? null)
+        
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : 'Bilinmeyen hata')
@@ -392,10 +392,27 @@ function App() {
   }, [selectedRingId, griLegFilter])
 
   const dayInfo = getDayProfile(new Date(clock), eveningHour)
+  const isWeekend = dayInfo.profile === 'weekend'
+
+  const availableRings = useMemo(
+    () =>
+      isWeekend
+        ? rings.filter((r) => r.id === 'gri')
+        : rings.filter((r) => r.id !== 'gri'),
+    [rings, isWeekend],
+  )
+
+  useEffect(() => {
+    if (!rings.length) return
+    setSelectedRingId((prev) => {
+      if (prev && availableRings.some((r) => r.id === prev)) return prev
+      return availableRings[0]?.id ?? null
+    })
+  }, [availableRings, rings])
 
   const firstRingIdForRouteDraw = useMemo(
-    () => rings[0]?.id ?? null,
-    [rings],
+    () => availableRings[0]?.id ?? null,
+    [availableRings],
   )
 
   const stopSheetPayload = useMemo(() => {
@@ -483,8 +500,8 @@ function App() {
   return (
     <div className="app">
       <RingPicker
-        rings={rings}
-        hasMetro={Boolean(metro)}
+        rings={availableRings}
+        hasMetro={!isWeekend && Boolean(metro)}
         selectedId={selectedRingId}
         onSelect={setSelectedRingId}
       />
