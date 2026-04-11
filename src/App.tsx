@@ -30,6 +30,7 @@ function App() {
   const [metro, setMetro] = useState<MetroLine | null>(null)
   const [eveningHour, setEveningHour] = useState(17)
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null)
+  const [griLegFilter, setGriLegFilter] = useState<'all' | 'a2-a1' | 'a1-a2'>('all')
   const [openStopRef, setOpenStopRef] = useState<{
     ringId: string
     stopId: string
@@ -118,6 +119,7 @@ function App() {
   useEffect(() => {
     setOpenStopRef(null)
     setCsvOnlyStop(null)
+    setGriLegFilter('all')
   }, [selectedRingId])
 
   useEffect(() => {
@@ -350,13 +352,23 @@ function App() {
     }
   }, [])
 
+  const GRI_SPLIT_INDEX = 21
+
   const ringsToShow = useMemo(() => {
     if (selectedRingId === METRO_VIEW_ID && metro) {
       return [metroLineAsRing(metro)]
     }
     if (!selectedRingId) return []
-    return rings.filter((r) => r.id === selectedRingId)
-  }, [rings, selectedRingId, metro])
+    const matched = rings.filter((r) => r.id === selectedRingId)
+    if (selectedRingId !== 'gri' || griLegFilter === 'all') return matched
+    return matched.map((ring) => {
+      const slicedStops =
+        griLegFilter === 'a2-a1'
+          ? ring.stops.slice(0, GRI_SPLIT_INDEX + 1)
+          : ring.stops.slice(GRI_SPLIT_INDEX)
+      return { ...ring, stops: slicedStops }
+    })
+  }, [rings, selectedRingId, metro, griLegFilter])
 
   const showRoutePolylines = selectedRingId !== METRO_VIEW_ID
 
@@ -457,6 +469,31 @@ function App() {
         selectedId={selectedRingId}
         onSelect={setSelectedRingId}
       />
+      {selectedRingId === 'gri' && !stopEditorActive ? (
+        <div className="gri-filter">
+          <button
+            type="button"
+            className={`gri-filter__btn${griLegFilter === 'all' ? ' gri-filter__btn--active' : ''}`}
+            onClick={() => setGriLegFilter('all')}
+          >
+            Tümü
+          </button>
+          <button
+            type="button"
+            className={`gri-filter__btn${griLegFilter === 'a2-a1' ? ' gri-filter__btn--active' : ''}`}
+            onClick={() => setGriLegFilter('a2-a1')}
+          >
+            A2 → A1
+          </button>
+          <button
+            type="button"
+            className={`gri-filter__btn${griLegFilter === 'a1-a2' ? ' gri-filter__btn--active' : ''}`}
+            onClick={() => setGriLegFilter('a1-a2')}
+          >
+            A1 → A2
+          </button>
+        </div>
+      ) : null}
       {selectedRingId === METRO_VIEW_ID &&
       metro &&
       !(stopEditorActive && showStopEditor) ? (
