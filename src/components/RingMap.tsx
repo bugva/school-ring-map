@@ -134,6 +134,8 @@ type Props = {
   firstRingIdForRouteDraw?: string | null
   /** Metro vb.: durak işaretlerini çizme */
   suppressStopMarkers?: boolean
+  /** Görünür durak index aralığı [start, end] (dahil); null = hepsi */
+  visibleStopRange?: [number, number] | null
 }
 
 const TILE_URL =
@@ -216,6 +218,7 @@ export function RingMap({
   draftStops = [],
   firstRingIdForRouteDraw = null,
   suppressStopMarkers = false,
+  visibleStopRange = null,
 }: Props) {
   /** ringId + stopIdx → sıralı numaralı işaret (her ring kendi 1..n) */
   const stopIconsByKey = useMemo(() => {
@@ -339,6 +342,7 @@ export function RingMap({
                   : ring.stops.map((stop, stopIdx) => {
                   const markerKey = `${ring.id}\0${stopIdx}`
                   if (skipLastStop.has(markerKey)) return null
+                  if (visibleStopRange && (stopIdx < visibleStopRange[0] || stopIdx > visibleStopRange[1])) return null
                   const icon = stopIconsByKey.get(markerKey)
                   if (!icon) return null
                   return (

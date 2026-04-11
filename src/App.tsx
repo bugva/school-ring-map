@@ -364,12 +364,8 @@ function App() {
     if (selectedRingId !== 'gri' || griLegFilter === 'all') return matched
     return matched.map((ring) => {
       const splitStop = ring.stops[GRI_SPLIT_INDEX]
-      const slicedStops =
-        griLegFilter === 'a2-a1'
-          ? ring.stops.slice(0, GRI_SPLIT_INDEX + 1)
-          : ring.stops.slice(GRI_SPLIT_INDEX)
 
-      let slicedPolyline = ring.polyline
+      let filteredPolyline = ring.polyline
       if (ring.polyline.length >= 2 && splitStop) {
         const k = nearestPolylineVertexIndex(
           ring.polyline as [number, number][],
@@ -377,17 +373,23 @@ function App() {
           splitStop.lng,
         )
         const safeK = Math.min(Math.max(k, 1), ring.polyline.length - 1)
-        slicedPolyline =
+        filteredPolyline =
           griLegFilter === 'a2-a1'
             ? ring.polyline.slice(0, safeK + 1)
             : ring.polyline.slice(safeK)
       }
 
-      return { ...ring, stops: slicedStops, polyline: slicedPolyline }
+      return { ...ring, polyline: filteredPolyline }
     })
   }, [rings, selectedRingId, metro, griLegFilter])
 
   const showRoutePolylines = selectedRingId !== METRO_VIEW_ID
+
+  const griVisibleStopRange = useMemo<[number, number] | null>(() => {
+    if (selectedRingId !== 'gri' || griLegFilter === 'all') return null
+    if (griLegFilter === 'a2-a1') return [0, GRI_SPLIT_INDEX]
+    return [GRI_SPLIT_INDEX, 38]
+  }, [selectedRingId, griLegFilter])
 
   const dayInfo = getDayProfile(new Date(clock), eveningHour)
 
@@ -560,6 +562,7 @@ function App() {
         draftStops={stopEditorActive ? draftStops : []}
         firstRingIdForRouteDraw={firstRingIdForRouteDraw}
         suppressStopMarkers={selectedRingId === METRO_VIEW_ID}
+        visibleStopRange={griVisibleStopRange}
       />
       <p className="app__map-hint" aria-live="polite">
         {stopEditorActive && showStopEditor
