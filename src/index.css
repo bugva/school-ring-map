@@ -1431,6 +1431,26 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   overflow: auto;
   animation: sheetSlideUp 0.35s var(--ease-out);
+  display: flex;
+  flex-direction: column;
+}
+
+.stop-sheet__sticky {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--sheet-bg);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.stop-sheet__sticky .stop-sheet__countdown {
+  margin: 0 1.1rem 0.5rem;
+}
+
+.stop-sheet__sticky .stop-sheet__progress-bar {
+  margin: 0 1.1rem 0;
 }
 
 .stop-sheet__handle {
