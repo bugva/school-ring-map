@@ -217,18 +217,35 @@ export function RingMap({
   firstRingIdForRouteDraw = null,
   suppressStopMarkers = false,
 }: Props) {
-  /** ringId + stopId → sıralı numaralı işaret (her ring kendi 1..n) */
-  const stopIconsByRingStop = useMemo(() => {
+  /** ringId + stopIdx → sıralı numaralı işaret (her ring kendi 1..n) */
+  const stopIconsByKey = useMemo(() => {
     const m = new Map<string, L.DivIcon>()
     for (const r of ringsToShow) {
-      r.stops.forEach((stop, stopIdx) => {
+      r.stops.forEach((_stop, stopIdx) => {
         m.set(
-          `${r.id}\0${stop.id}`,
+          `${r.id}\0${stopIdx}`,
           createStopDivIcon(r.color, stopIdx + 1),
         )
       })
     }
     return m
+  }, [ringsToShow])
+
+  /** Döngüsel rotalarda son durak ilk durakla aynı konumdaysa atlansın */
+  const skipLastStop = useMemo(() => {
+    const skip = new Set<string>()
+    for (const r of ringsToShow) {
+      if (r.stops.length < 2) continue
+      const first = r.stops[0]
+      const last = r.stops[r.stops.length - 1]
+      const samePos =
+        Math.abs(first.lat - last.lat) < 0.0001 &&
+        Math.abs(first.lng - last.lng) < 0.0001
+      if (samePos) {
+        skip.add(`${r.id}\0${r.stops.length - 1}`)
+      }
+    }
+    return skip
   }, [ringsToShow])
 
   const dataOnlyIcon = useMemo(() => createUploadedStopsOnlyIcon(), [])
@@ -320,7 +337,9 @@ export function RingMap({
                 {ring.id === METRO_VIEW_ID
                   ? null
                   : ring.stops.map((stop, stopIdx) => {
-                  const icon = stopIconsByRingStop.get(`${ring.id}\0${stop.id}`)
+                  const markerKey = `${ring.id}\0${stopIdx}`
+                  if (skipLastStop.has(markerKey)) return null
+                  const icon = stopIconsByKey.get(markerKey)
                   if (!icon) return null
                   return (
                     <Marker
@@ -376,7 +395,7 @@ export function RingMap({
                 const num = order >= 0 ? order + 1 : 0
                 const icon =
                   num > 0
-                    ? (stopIconsByRingStop.get(`${ringId}\0${stop.id}`) ??
+                    ? (stopIconsByKey.get(`${ringId}\0${order}`) ??
                       dataOnlyIcon)
                     : dataOnlyIcon
                 return (
