@@ -9,11 +9,7 @@ import { patchOverviewCsvLine } from './lib/patchOverviewCsvText'
 import { ringsDataSchema } from './lib/ringsSchema'
 import { getDayProfile } from './lib/dayProfile'
 import { isStopEditorEnabled } from './lib/stopEditorEnv'
-import {
-  ALL_STOPS_VIEW_ID,
-  METRO_VIEW_ID,
-  STOPS_ONLY_VIEW_ID,
-} from './lib/mapView'
+import { METRO_VIEW_ID } from './lib/mapView'
 import { metroLineAsRing } from './lib/metroRing'
 import { publicUrl } from './lib/publicUrl'
 import {
@@ -24,7 +20,6 @@ import type { MetroLine, Ring } from './types/rings'
 import { CsvStopSheet } from './components/CsvStopSheet'
 import { RingPicker } from './components/RingPicker'
 import { RingMap } from './components/RingMap'
-import { StopsOverviewPanel } from './components/StopsOverviewPanel'
 import { MetroTimesPanel } from './components/MetroTimesPanel'
 import { StopTimesSheet } from './components/StopTimesSheet'
 import { StopEditorPanel, type DraftStop } from './components/StopEditorPanel'
@@ -58,9 +53,7 @@ function App() {
   )
 
   const [overviewCsvText, setOverviewCsvText] = useState<string | null>(null)
-  const [overviewStops, setOverviewStops] = useState<CsvOverviewStop[]>([])
-  const [overviewCsvLoaded, setOverviewCsvLoaded] = useState(false)
-  const [overviewCsvErr, setOverviewCsvErr] = useState<string | null>(null)
+  const [, setOverviewStops] = useState<CsvOverviewStop[]>([])
   const [csvOnlyStop, setCsvOnlyStop] = useState<{
     id: string
     lat: number
@@ -83,15 +76,11 @@ function App() {
         if (cancelled) return
         setOverviewCsvText(t.trim())
         setOverviewStops(parseStopsOverviewCsv(t))
-        setOverviewCsvErr(null)
-        setOverviewCsvLoaded(true)
       })
-      .catch((e) => {
+      .catch(() => {
         if (!cancelled) {
-          setOverviewCsvErr(e instanceof Error ? e.message : 'Hata')
           setOverviewCsvText(null)
           setOverviewStops([])
-          setOverviewCsvLoaded(true)
         }
       })
     return () => {
@@ -159,7 +148,6 @@ function App() {
         const trimmed = t.trim()
         setOverviewCsvText(trimmed)
         setOverviewStops(parseStopsOverviewCsv(t))
-        setOverviewCsvErr(null)
       }
       clearEditorDraft()
       setBrowserDraftSavedAt(null)
@@ -279,7 +267,6 @@ function App() {
       const t = d.overviewCsvText.trim()
       setOverviewCsvText(t)
       setOverviewStops(parseStopsOverviewCsv(t))
-      setOverviewCsvErr(null)
     }
     setRingsDataDirty(true)
     flashEditorFeedback('Taslak belleğe yüklendi; isterseniz tekrar indirin.')
@@ -325,7 +312,6 @@ function App() {
         }
         setOverviewCsvText(trimmed)
         setOverviewStops(rows)
-        setOverviewCsvErr(null)
         syncRingStopsFromOverview(rows)
         setRingsDataDirty(true)
         flashEditorFeedback(`stops-overview.csv uygulandı (${file.name}).`)
@@ -352,9 +338,7 @@ function App() {
         setEveningHour(parsed.data.eveningHourLocal)
         setRings(parsed.data.rings)
         setMetro(parsed.data.metro ?? null)
-        setSelectedRingId(
-          (prev) => prev ?? parsed.data.rings[0]?.id ?? ALL_STOPS_VIEW_ID,
-        )
+        setSelectedRingId((prev) => prev ?? parsed.data.rings[0]?.id ?? null)
       } catch (e) {
         if (!cancelled) {
           setLoadError(e instanceof Error ? e.message : 'Bilinmeyen hata')
@@ -370,18 +354,11 @@ function App() {
     if (selectedRingId === METRO_VIEW_ID && metro) {
       return [metroLineAsRing(metro)]
     }
-    if (
-      selectedRingId === ALL_STOPS_VIEW_ID ||
-      selectedRingId === STOPS_ONLY_VIEW_ID
-    ) {
-      return rings
-    }
+    if (!selectedRingId) return []
     return rings.filter((r) => r.id === selectedRingId)
   }, [rings, selectedRingId, metro])
 
-  const showRoutePolylines =
-    selectedRingId !== STOPS_ONLY_VIEW_ID &&
-    selectedRingId !== METRO_VIEW_ID
+  const showRoutePolylines = selectedRingId !== METRO_VIEW_ID
 
   const dayInfo = getDayProfile(new Date(clock), eveningHour)
 
@@ -480,12 +457,6 @@ function App() {
         selectedId={selectedRingId}
         onSelect={setSelectedRingId}
       />
-      <StopsOverviewPanel
-        active={selectedRingId === STOPS_ONLY_VIEW_ID}
-        csvText={overviewCsvText}
-        csvLoaded={overviewCsvLoaded}
-        csvError={overviewCsvErr}
-      />
       {selectedRingId === METRO_VIEW_ID &&
       metro &&
       !(stopEditorActive && showStopEditor) ? (
@@ -522,15 +493,12 @@ function App() {
       <RingMap
         ringsToShow={ringsToShow}
         showRoutePolylines={showRoutePolylines}
-        csvOverviewStops={
-          selectedRingId === STOPS_ONLY_VIEW_ID ? overviewStops : []
-        }
+        csvOverviewStops={[]}
         onStopClick={handleStopClick}
         onCsvOverviewStopClick={handleCsvOverviewStopClick}
         stopEditorActive={stopEditorActive && showStopEditor}
         stopRepositionActive={
           Boolean(stopEditorActive && showStopEditor && repositionStopsActive) &&
-          selectedRingId !== STOPS_ONLY_VIEW_ID &&
           selectedRingId !== METRO_VIEW_ID
         }
         onStopPositionChange={
@@ -544,15 +512,11 @@ function App() {
       <p className="app__map-hint" aria-live="polite">
         {stopEditorActive && showStopEditor
           ? repositionStopsActive
-            ? selectedRingId === STOPS_ONLY_VIEW_ID
-              ? 'Bu görünümde sürükleme yok; tek ring veya “Tüm duraklar” seçin.'
-              : 'Durak işaretini sürükleyin. Bitince panelde “Tamam — rings.json indir”.'
+            ? 'Durak işaretini sürükleyin. Bitince panelde “Tamam — rings.json indir”.'
             : 'Durak ekleme: haritaya tıklayın. Haritayı kaydırmak için sürükleyin.'
-          : selectedRingId === STOPS_ONLY_VIEW_ID
-            ? 'CSV’deki tüm duraklar haritada (rota çizgisi yok). Yakınlaştırmak için iki parmak kullanın.'
-            : selectedRingId === METRO_VIEW_ID
-              ? 'Metro sefer saatleri yukarıda listelenir; haritada durak işareti yok.'
-              : 'Haritayı iki parmakla yakınlaştırıp uzaklaştırabilirsiniz.'}
+          : selectedRingId === METRO_VIEW_ID
+            ? 'Metro sefer saatleri yukarıda listelenir; haritada durak işareti yok.'
+            : 'Haritayı iki parmakla yakınlaştırıp uzaklaştırabilirsiniz.'}
       </p>
       {stopSheetPayload && !stopEditorActive ? (
         <StopTimesSheet
