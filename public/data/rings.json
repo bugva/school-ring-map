@@ -19141,10 +19141,10 @@
           }
         },
         {
-          "id": "enformatik-2",
-          "name": "Enformatik (2)",
-          "lat": 39.8924,
-          "lng": 32.77731,
+          "id": "gida-1",
+          "name": "Gida (1)",
+          "lat": 39.8876,
+          "lng": 32.77949,
           "times": {
             "weekday_day": [],
             "weekday_evening": [],
@@ -19165,10 +19165,10 @@
           }
         },
         {
-          "id": "teknokent-2",
-          "name": "Teknokent (2)",
-          "lat": 39.89661,
-          "lng": 32.77693,
+          "id": "jeoloji-1",
+          "name": "Jeoloji (1)",
+          "lat": 39.88661,
+          "lng": 32.78122,
           "times": {
             "weekday_day": [],
             "weekday_evening": [],
@@ -19189,10 +19189,10 @@
           }
         },
         {
-          "id": "iibf-1",
-          "name": "Iibf (1)",
-          "lat": 39.89929,
-          "lng": 32.78373,
+          "id": "kimya-1",
+          "name": "Kimya (1)",
+          "lat": 39.88727,
+          "lng": 32.78254,
           "times": {
             "weekday_day": [],
             "weekday_evening": [],
@@ -19213,10 +19213,10 @@
           }
         },
         {
-          "id": "rektorluk-1",
-          "name": "Rektorluk (1)",
-          "lat": 39.89583088124915,
-          "lng": 32.78437258916084,
+          "id": "insaat-1",
+          "name": "İnşaat (1)",
+          "lat": 39.88967,
+          "lng": 32.7843,
           "times": {
             "weekday_day": [],
             "weekday_evening": [],
